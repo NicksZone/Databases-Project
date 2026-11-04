@@ -25,8 +25,8 @@
     <h2>{{ title }}</h2>
     {% if not row %}
       <p>No such article.</p>
-    {% elif row.old_content is none or row.new_content is none %}
-      <p>The article did not exist yet on {{ (from_moment if row.old_content is none else to_moment).strftime('%d %B %Y') }}, as far as the loaded history goes. Pick a later date.</p>
+    {% elif row.old_rev_id is none or row.new_rev_id is none %}
+      <p>The article did not exist yet on {{ (from_moment if row.old_rev_id is none else to_moment).strftime('%d %B %Y') }}, as far as the loaded history goes. Pick a later date.</p>
     {% elif row.old_rev_id == row.new_rev_id %}
       <p>Both moments show the same stored version (revision {{ row.new_rev_id }}, live from {{ row.new_start.strftime('%d %b %Y') }}), so nothing changed in between.</p>
     {% else %}

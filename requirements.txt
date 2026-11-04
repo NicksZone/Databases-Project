@@ -3,3 +3,4 @@ flask>=3.0,<4
 python-dotenv>=1.0,<2
 requests>=2.31,<3
 mwparserfromhell>=0.6,<1
+pytest>=8,<10

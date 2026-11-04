@@ -1,0 +1,182 @@
+{
+  "mariadb": "12.3.3-MariaDB",
+  "articles": [
+    "Pluto",
+    "MariaDB",
+    "SQL",
+    "Tbilisi",
+    "Chess"
+  ],
+  "results": [
+    {
+      "versions_per_article": 1,
+      "partitioned": false,
+      "rows": 5,
+      "load_s": 0.02,
+      "as_of_new_ms": 0.117,
+      "as_of_mid_ms": 0.114,
+      "as_of_old_ms": 0.115,
+      "current_ms": 0.059,
+      "count_current_ms": 0.05,
+      "rows_examined_as_of_old": 1.0,
+      "rows_examined_as_of_new": 1.0,
+      "rows_examined_count_current": 5.0,
+      "size_mb": 0.1
+    },
+    {
+      "versions_per_article": 1,
+      "partitioned": true,
+      "rows": 5,
+      "load_s": 0.02,
+      "as_of_new_ms": 0.124,
+      "as_of_mid_ms": 0.124,
+      "as_of_old_ms": 0.121,
+      "current_ms": 0.064,
+      "count_current_ms": 0.054,
+      "rows_examined_as_of_old": 1.0,
+      "rows_examined_as_of_new": 1.0,
+      "rows_examined_count_current": 5.0,
+      "size_mb": 0.1,
+      "partition_mb": {
+        "p_current": 0.1,
+        "p_history": 0.1
+      }
+    },
+    {
+      "versions_per_article": 10,
+      "partitioned": false,
+      "rows": 50,
+      "load_s": 0.11,
+      "as_of_new_ms": 0.112,
+      "as_of_mid_ms": 0.123,
+      "as_of_old_ms": 0.124,
+      "current_ms": 0.06,
+      "count_current_ms": 0.058,
+      "rows_examined_as_of_old": 10.0,
+      "rows_examined_as_of_new": 1.0,
+      "rows_examined_count_current": 50.0,
+      "size_mb": 0.5
+    },
+    {
+      "versions_per_article": 10,
+      "partitioned": true,
+      "rows": 50,
+      "load_s": 0.1,
+      "as_of_new_ms": 0.129,
+      "as_of_mid_ms": 0.131,
+      "as_of_old_ms": 0.139,
+      "current_ms": 0.064,
+      "count_current_ms": 0.061,
+      "rows_examined_as_of_old": 10.0,
+      "rows_examined_as_of_new": 1.0,
+      "rows_examined_count_current": 5.0,
+      "size_mb": 0.5,
+      "partition_mb": {
+        "p_current": 0.1,
+        "p_history": 0.4
+      }
+    },
+    {
+      "versions_per_article": 100,
+      "partitioned": false,
+      "rows": 500,
+      "load_s": 0.67,
+      "as_of_new_ms": 0.195,
+      "as_of_mid_ms": 0.447,
+      "as_of_old_ms": 0.637,
+      "current_ms": 0.068,
+      "count_current_ms": 0.104,
+      "rows_examined_as_of_old": 100.0,
+      "rows_examined_as_of_new": 1.0,
+      "rows_examined_count_current": 500.0,
+      "size_mb": 40.0
+    },
+    {
+      "versions_per_article": 100,
+      "partitioned": true,
+      "rows": 500,
+      "load_s": 0.71,
+      "as_of_new_ms": 0.138,
+      "as_of_mid_ms": 0.477,
+      "as_of_old_ms": 0.639,
+      "current_ms": 0.085,
+      "count_current_ms": 0.061,
+      "rows_examined_as_of_old": 100.0,
+      "rows_examined_as_of_new": 1.0,
+      "rows_examined_count_current": 5.0,
+      "size_mb": 40.5,
+      "partition_mb": {
+        "p_current": 0.5,
+        "p_history": 40.0
+      }
+    },
+    {
+      "versions_per_article": 500,
+      "partitioned": false,
+      "rows": 2500,
+      "load_s": 3.54,
+      "as_of_new_ms": 0.133,
+      "as_of_mid_ms": 1.508,
+      "as_of_old_ms": 2.82,
+      "current_ms": 0.082,
+      "count_current_ms": 0.352,
+      "rows_examined_as_of_old": 500.0,
+      "rows_examined_as_of_new": 1.0,
+      "rows_examined_count_current": 2500.0,
+      "size_mb": 188.0
+    },
+    {
+      "versions_per_article": 500,
+      "partitioned": true,
+      "rows": 2500,
+      "load_s": 3.01,
+      "as_of_new_ms": 0.139,
+      "as_of_mid_ms": 1.428,
+      "as_of_old_ms": 2.776,
+      "current_ms": 0.072,
+      "count_current_ms": 0.057,
+      "rows_examined_as_of_old": 500.0,
+      "rows_examined_as_of_new": 1.0,
+      "rows_examined_count_current": 5.0,
+      "size_mb": 188.5,
+      "partition_mb": {
+        "p_current": 0.5,
+        "p_history": 188.0
+      }
+    },
+    {
+      "versions_per_article": 1000,
+      "partitioned": false,
+      "rows": 5000,
+      "load_s": 7.65,
+      "as_of_new_ms": 0.141,
+      "as_of_mid_ms": 2.787,
+      "as_of_old_ms": 5.243,
+      "current_ms": 0.071,
+      "count_current_ms": 0.631,
+      "rows_examined_as_of_old": 1000.0,
+      "rows_examined_as_of_new": 1.0,
+      "rows_examined_count_current": 5000.0,
+      "size_mb": 372.0
+    },
+    {
+      "versions_per_article": 1000,
+      "partitioned": true,
+      "rows": 5000,
+      "load_s": 7.17,
+      "as_of_new_ms": 0.358,
+      "as_of_mid_ms": 4.21,
+      "as_of_old_ms": 5.748,
+      "current_ms": 0.081,
+      "count_current_ms": 0.083,
+      "rows_examined_as_of_old": 1000.0,
+      "rows_examined_as_of_new": 1.0,
+      "rows_examined_count_current": 5.0,
+      "size_mb": 372.5,
+      "partition_mb": {
+        "p_current": 0.5,
+        "p_history": 372.0
+      }
+    }
+  ]
+}

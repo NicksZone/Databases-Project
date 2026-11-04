@@ -1,12 +1,12 @@
 """Turning stored wikitext into something readable, and comparing two versions.
 
 Nothing in here touches the database: it works on the text that the
-FOR SYSTEM_TIME queries return.
+FOR SYSTEM_TIME queries return. The results are cached in the `rendered`
+table by timemachine.web and timemachine.warm.
 """
 
 import re
 from difflib import SequenceMatcher
-from functools import lru_cache
 
 import mwparserfromhell
 
@@ -16,10 +16,11 @@ NON_TEXT_LINK = re.compile(r"^\s*(file|image|category|media|[a-z]{2,3}(-[a-z]+)?
 HEADING_MARK = "§§ "
 
 
-@lru_cache(maxsize=512)  # parsing takes ~0.3 s per version, and versions never change
-def to_paragraphs(wikitext: str) -> tuple[dict, ...]:
-    """Wikitext -> ({"heading": bool, "text": str}, ...). Not a full renderer: just enough
-    to read the article. Templates such as infoboxes, references and images are dropped."""
+def to_paragraphs(wikitext: str) -> list[dict]:
+    """Wikitext -> [{"heading": bool, "text": str}, ...]. Not a full renderer: just enough
+    to read the article. Templates such as infoboxes, references and images are dropped.
+    Slow (0.4 to 1 s for a long article), which is why the result is cached."""
+    wikitext = wikitext.replace("\r\n", "\n")  # revisions from 2001-2004 use Windows line endings
     wikitext = re.sub(r"^'{2,}\s*$", "", wikitext, flags=re.MULTILINE)  # a lone ''' would turn the rest bold
     wikitext = re.sub(r"^:\s*''.*$", "", wikitext, flags=re.MULTILINE)  # old-style hatnotes (": ''For other uses, see ...''")
 
@@ -44,7 +45,7 @@ def to_paragraphs(wikitext: str) -> tuple[dict, ...]:
         elif p:
             out.append({"heading": False, "text": p})
     # Drop headings with nothing under them (their section was all images or tables)
-    return tuple(p for i, p in enumerate(out) if not p["heading"] or (i + 1 < len(out) and not out[i + 1]["heading"]))
+    return [p for i, p in enumerate(out) if not p["heading"] or (i + 1 < len(out) and not out[i + 1]["heading"])]
 
 
 def _word_diff(old: str, new: str) -> list[tuple[str, str]]:
@@ -61,16 +62,16 @@ def _word_diff(old: str, new: str) -> list[tuple[str, str]]:
     return parts
 
 
-def diff(old_wikitext: str, new_wikitext: str) -> dict:
-    """Paragraph-level diff, with word-level detail inside changed paragraphs.
+def diff(old: list[dict], new: list[dict]) -> dict:
+    """Paragraph-level diff of two to_paragraphs() results, with word-level detail
+    inside changed paragraphs.
 
     Returns {"blocks": [...], "added": n, "removed": n, "changed": n}, where each block is
       {"kind": "same", "count": n}                    a run of unchanged paragraphs
       {"kind": "added" | "removed", "para": {...}}    a whole paragraph
       {"kind": "changed", "heading": bool, "parts": [(kind, text), ...]}
     """
-    old, new = to_paragraphs(old_wikitext), to_paragraphs(new_wikitext)
-    a, b = [p["text"] for p in old], [p["text"] for p in new]
+    a, b =[p["text"] for p in old], [p["text"] for p in new]
     blocks, stats = [], {"added": 0, "removed": 0, "changed": 0}
 
     for op, i1, i2, j1, j2 in SequenceMatcher(None, a, b, autojunk=False).get_opcodes():

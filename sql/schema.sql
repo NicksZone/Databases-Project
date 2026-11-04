@@ -30,3 +30,17 @@ CREATE OR REPLACE TABLE page_content (
     PERIOD FOR SYSTEM_TIME (sys_start, sys_end)
 ) ENGINE=InnoDB
   WITH SYSTEM VERSIONING;
+
+-- A cache of each revision turned into readable paragraphs. Turning wikitext
+-- into text takes Python 0.4 to 1 second per version, the queries above take
+-- about a millisecond, so the web page stores the result the first time.
+-- Keyed by rev_id, because a Wikipedia revision never changes. Not versioned:
+-- it is derived data, and history of a cache would mean nothing.
+-- IF NOT EXISTS rather than OR REPLACE: a reload keeps the cache, since the
+-- same revisions render the same way. python -m timemachine.warm --rebuild
+-- empties it when the rendering code changes.
+CREATE TABLE IF NOT EXISTS rendered (
+    rev_id      INT UNSIGNED NOT NULL PRIMARY KEY,
+    paragraphs  JSON NOT NULL,                    -- [{"heading": bool, "text": str}, ...]
+    rendered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
