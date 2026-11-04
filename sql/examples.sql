@@ -28,8 +28,10 @@ WHERE p.title = 'Pluto'
 ORDER BY c.sys_start;
 
 -- 4. Versions that were live at some point during 2020.
+--    Give both ends a time part: MariaDB 12.3 rejects TIMESTAMP '2020-01-01' here
+--    with ERROR 1525 (Incorrect DATETIME value). tests/test_sql.py runs this file.
 SELECT p.title, COUNT(*) AS versions_live_in_2020
-FROM page_content FOR SYSTEM_TIME BETWEEN TIMESTAMP '2020-01-01' AND TIMESTAMP '2020-12-31 23:59:59' AS c
+FROM page_content FOR SYSTEM_TIME BETWEEN TIMESTAMP '2020-01-01 00:00:00' AND TIMESTAMP '2020-12-31 23:59:59' AS c
 JOIN pages p USING (page_id)
 GROUP BY p.title
 ORDER BY versions_live_in_2020 DESC;
@@ -40,3 +42,15 @@ SELECT
     SUM(sys_end <= NOW())                          AS history_rows,
     ROUND(SUM(LENGTH(content)) / 1024 / 1024, 1)   AS text_mb
 FROM page_content FOR SYSTEM_TIME ALL;
+
+-- 6. History size per article: what the current text costs, and what its past costs.
+SELECT p.title,
+       COUNT(*)                                                          AS versions,
+       ROUND(SUM(IF(c.sys_end >  NOW(), LENGTH(c.content), 0)) / 1024)  AS current_kb,
+       ROUND(SUM(IF(c.sys_end <= NOW(), LENGTH(c.content), 0)) / 1024)  AS history_kb,
+       ROUND(SUM(IF(c.sys_end <= NOW(), LENGTH(c.content), 0))
+           / SUM(IF(c.sys_end >  NOW(), LENGTH(c.content), 0)), 1)      AS history_x_current
+FROM page_content FOR SYSTEM_TIME ALL AS c
+JOIN pages p USING (page_id)
+GROUP BY p.title
+ORDER BY history_kb DESC;
