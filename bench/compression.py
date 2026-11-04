@@ -35,27 +35,35 @@ from pathlib import Path
 
 from timemachine.db import connect
 from timemachine.fetch import RAW_DIR, ROOT
-from timemachine.load import SCHEMA_FILE, load_article, run_schema
+from timemachine.load import SCHEMA_FILE, load_insert_history, read_article, run_schema
 
 RESULTS = ROOT / "bench" / "results" / "compression.json"
 TABLE_OPTIONS = re.compile(r"\) ENGINE=InnoDB(\s+WITH SYSTEM VERSIONING)")
 CONTENT_COLUMN = re.compile(r"(content\s+MEDIUMTEXT)")
 
+def uncompressed(sql: str) -> str:
+    """The schema with any compression taken out, so every variant starts from the same base."""
+    return sql.replace("MEDIUMTEXT COMPRESSED", "MEDIUMTEXT")
+
+
 VARIANTS = {
-    "none": lambda sql: sql,
-    "column": lambda sql: CONTENT_COLUMN.sub(r"\1 COMPRESSED", sql, count=1),
-    "page": lambda sql: TABLE_OPTIONS.sub(r") ENGINE=InnoDB PAGE_COMPRESSED=1\1", sql, count=1),
-    "row": lambda sql: TABLE_OPTIONS.sub(r") ENGINE=InnoDB ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8\1", sql, count=1),
+    "none": uncompressed,
+    "column": lambda sql: CONTENT_COLUMN.sub(r"\1 COMPRESSED", uncompressed(sql), count=1),
+    "page": lambda sql: TABLE_OPTIONS.sub(r") ENGINE=InnoDB PAGE_COMPRESSED=1\1", uncompressed(sql), count=1),
+    "row": lambda sql: TABLE_OPTIONS.sub(r") ENGINE=InnoDB ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8\1", uncompressed(sql), count=1),
 }
 
 QUERIES = {
-    # one article as of a date: decompresses one version
+    # one article as of a date, reading its text: decompresses one version
     "as_of_ms": ("SELECT LENGTH(content) FROM page_content FOR SYSTEM_TIME AS OF TIMESTAMP '2026-01-01 00:00:00' "
                  "WHERE page_id = (SELECT page_id FROM pages WHERE title = 'Barack Obama')"),
-    # the timeline query: LENGTH() of every version of one article
-    "timeline_ms": ("SELECT c.rev_id, LENGTH(c.content) FROM page_content FOR SYSTEM_TIME ALL AS c "
+    # the timeline query as the app runs it: the stored content_bytes column, no text read
+    "timeline_ms": ("SELECT c.rev_id, c.content_bytes FROM page_content FOR SYSTEM_TIME ALL AS c "
                     "JOIN pages p USING (page_id) WHERE p.title = 'Barack Obama'"),
-    # touch every version of every article
+    # the same, computing the size with LENGTH(content): every version's text is read
+    "timeline_length_ms": ("SELECT c.rev_id, LENGTH(c.content) FROM page_content FOR SYSTEM_TIME ALL AS c "
+                           "JOIN pages p USING (page_id) WHERE p.title = 'Barack Obama'"),
+    # read every version of every article
     "full_scan_ms": "SELECT SUM(LENGTH(content)) FROM page_content FOR SYSTEM_TIME ALL",
 }
 
@@ -103,19 +111,27 @@ def time_query(cur, sql: str, repeat: int = 15) -> float:
 
 
 def run_variant(name: str, runs: int, files: list[Path], datadir: Path) -> dict:
-    schema = VARIANTS[name](SCHEMA_FILE.read_text(encoding="utf-8"))
-    if name != "none" and schema == SCHEMA_FILE.read_text(encoding="utf-8"):
+    base = uncompressed(SCHEMA_FILE.read_text(encoding="utf-8"))
+    schema = VARIANTS[name](base)
+    if name != "none" and schema == base:
         raise SystemExit(f"variant {name!r} did not change the schema, check the patterns")
 
     conn = connect(autocommit=True)
     cur = conn.cursor()
+    articles = [read_article(path) for path in files]
     load_times = []
     for _ in range(runs):
+        conn.autocommit = True
         start = time.perf_counter()
         run_schema(cur, schema)
-        for path in files:
-            load_article(cur, path)
+        # the same loader as timemachine.load: system_versioning_insert_history, one transaction per article
+        conn.autocommit = False
+        cur.execute("SET system_versioning_insert_history = ON")
+        for article in articles:
+            load_insert_history(conn, article)
         load_times.append(time.perf_counter() - start)
+    conn.autocommit = True
+    cur.execute("SET system_versioning_insert_history = OFF")
 
     flush_wait = flush_to_disk(cur)
     cur.execute("ANALYZE TABLE page_content")
@@ -143,13 +159,14 @@ def run_variant(name: str, runs: int, files: list[Path], datadir: Path) -> dict:
 def markdown(results: list[dict]) -> str:
     base = next(r for r in results if r["variant"] == "none")
     lines = [
-        "| variant | on disk | vs none | load | AS OF one version | timeline (92 versions) | full scan (1,708 versions) |",
-        "|---|---|---|---|---|---|---|",
+        "| variant | on disk | vs none | load | AS OF one version | timeline, content_bytes | timeline, LENGTH(content) | full scan (1,708 versions) |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for r in results:
         lines.append(
             f"| `{r['variant']}` | {r['on_disk_mb']} MB | {r['on_disk_mb'] / base['on_disk_mb']:.0%} "
-            f"| {r['load_s_median']} s | {r['as_of_ms']} ms | {r['timeline_ms']} ms | {r['full_scan_ms']} ms |"
+            f"| {r['load_s_median']} s | {r['as_of_ms']} ms | {r['timeline_ms']} ms "
+            f"| {r['timeline_length_ms']} ms | {r['full_scan_ms']} ms |"
         )
     return "\n".join(lines)
 

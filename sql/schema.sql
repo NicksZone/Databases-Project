@@ -21,7 +21,13 @@ CREATE OR REPLACE TABLE page_content (
     rev_id        INT UNSIGNED NOT NULL,          -- Wikipedia revision id of this version
     editor        VARCHAR(255) NULL,              -- NULL when Wikipedia hides the user name
     edit_comment  TEXT NULL,
-    content       MEDIUMTEXT NOT NULL,            -- raw wikitext
+    -- Raw wikitext, compressed by MariaDB (zlib, per value). History is ~98% of
+    -- this table and each version repeats the whole article, so this takes the
+    -- table from 224 MB to 88 MB. bench/compression.py measures the cost.
+    content       MEDIUMTEXT COMPRESSED NOT NULL,
+    -- The size of each version, worked out once when the row is written, so the
+    -- timeline never has to read (or decompress) 1,708 texts to draw a chart.
+    content_bytes INT UNSIGNED AS (LENGTH(content)) STORED,
 
     -- The system period. The server fills these in, the application never does.
     -- INVISIBLE keeps them out of SELECT * until you name them.

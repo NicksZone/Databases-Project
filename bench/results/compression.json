@@ -1,0 +1,78 @@
+{
+  "mariadb": "12.3.3-MariaDB",
+  "machine": "Windows 11, 20 logical cores",
+  "innodb_buffer_pool_mb": 2000,
+  "innodb_compression_algorithm": "zlib",
+  "column_compression_zlib_level": 6,
+  "runs_per_variant": 3,
+  "results": [
+    {
+      "variant": "none",
+      "load_s_median": 2.28,
+      "load_s_runs": [
+        3.4,
+        2.28,
+        1.78
+      ],
+      "file_mb": 224.0,
+      "on_disk_mb": 224.0,
+      "innodb_data_length_mb": 221.5,
+      "flush_s": 0.2,
+      "as_of_ms": 0.2,
+      "timeline_ms": 1.53,
+      "timeline_length_ms": 1.72,
+      "full_scan_ms": 15.5
+    },
+    {
+      "variant": "column",
+      "load_s_median": 8.33,
+      "load_s_runs": [
+        9.59,
+        8.33,
+        7.95
+      ],
+      "file_mb": 88.0,
+      "on_disk_mb": 88.0,
+      "innodb_data_length_mb": 82.5,
+      "flush_s": 0.2,
+      "as_of_ms": 1.11,
+      "timeline_ms": 0.42,
+      "timeline_length_ms": 54.39,
+      "full_scan_ms": 546.39
+    },
+    {
+      "variant": "page",
+      "load_s_median": 5.12,
+      "load_s_runs": [
+        5.58,
+        4.86,
+        5.12
+      ],
+      "file_mb": 224.0,
+      "on_disk_mb": 221.4,
+      "innodb_data_length_mb": 221.5,
+      "flush_s": 2.4,
+      "as_of_ms": 0.19,
+      "timeline_ms": 1.45,
+      "timeline_length_ms": 1.71,
+      "full_scan_ms": 15.48
+    },
+    {
+      "variant": "row",
+      "load_s_median": 8.18,
+      "load_s_runs": [
+        9.99,
+        8.18,
+        8.03
+      ],
+      "file_mb": 80.0,
+      "on_disk_mb": 80.0,
+      "innodb_data_length_mb": 76.8,
+      "flush_s": 0.5,
+      "as_of_ms": 5.68,
+      "timeline_ms": 67.71,
+      "timeline_length_ms": 68.52,
+      "full_scan_ms": 669.06
+    }
+  ]
+}

@@ -41,7 +41,7 @@ WHERE p.title = ?
 
 # Every stored version of one article, for the timeline.
 ARTICLE_VERSIONS = """
-SELECT c.rev_id, c.editor, c.sys_start, LENGTH(c.content) AS bytes
+SELECT c.rev_id, c.editor, c.sys_start, c.content_bytes AS bytes
 FROM page_content FOR SYSTEM_TIME ALL AS c
 JOIN pages p USING (page_id)
 WHERE p.title = ?

@@ -28,7 +28,7 @@ Requirements: MariaDB 12.3 (11.8 or later should also work) and Python 3.11 or l
 3. Download the revisions, load them, and start the page:
    ```bash
    python -m timemachine.fetch     # about 20 articles, one revision per quarter, saved to data/raw/
-   python -m timemachine.load      # recreates the schema and loads the history (about 5 s)
+   python -m timemachine.load      # recreates the schema and loads the history (about 10 s)
    python -m timemachine.warm      # optional: pre-render every version (about 100 s on 20 cores)
    flask --app timemachine.web run # open http://127.0.0.1:5000
    ```
@@ -48,7 +48,7 @@ See [`sql/schema.sql`](sql/schema.sql).
 | table | engine / options | holds |
 |---|---|---|
 | `pages` | InnoDB, not versioned | one row per article: `page_id`, `title` |
-| `page_content` | InnoDB, `WITH SYSTEM VERSIONING` | the current text of each article, plus every earlier version, kept by the server |
+| `page_content` | InnoDB, `WITH SYSTEM VERSIONING`, `content MEDIUMTEXT COMPRESSED` | the current text of each article, plus every earlier version, kept by the server, with each version's size in a stored `content_bytes` column |
 | `rendered` | InnoDB, not versioned | a cache: each revision turned into readable paragraphs (JSON), keyed by `rev_id` |
 
 Why these tables:
@@ -165,6 +165,27 @@ What the numbers say:
 - **Partitioning by `SYSTEM_TIME` does not speed up `AS OF`.** It reads both partitions, and was slightly slower here. What it does is keep *current-data* scans constant: `COUNT(*)` stays at 0.08 ms with 1,000 versions per article instead of 0.63 ms, because the history partition is pruned. It also turns history clean-up into dropping a partition. It is worth it for a table where most queries are about the present.
 - At this project's real size (about 100 versions per article) the oldest-moment cost is about 0.6 ms, so the history adds no visible cost to the page.
 
+### Compressing the history
+
+Since history is 98% of the table and every version repeats most of the article, it should compress well. MariaDB has three ways to do it. [`bench/compression.py`](bench/compression.py) loads the same data into `page_content` with each one, using the same loader as `timemachine.load`. It forces InnoDB to write to disk with `FLUSH TABLES ... FOR EXPORT` (which needs `GRANT RELOAD`), then reads the size of the `.ibd` file. MariaDB 12.3.3, zlib level 6, median of 3 loads, query times are medians of 15 runs on a warm buffer pool:
+
+| variant | on disk | vs none | load | `AS OF`, reading the text | timeline, `content_bytes` | timeline, `LENGTH(content)` | read every version |
+|---|---|---|---|---|---|---|---|
+| none | 224 MB | 100% | 2.3 s | 0.20 ms | 1.53 ms | 1.72 ms | 16 ms |
+| **`content MEDIUMTEXT COMPRESSED`** | **88 MB** | **39%** | 8.3 s | 1.11 ms | **0.42 ms** | 54 ms | 546 ms |
+| `PAGE_COMPRESSED=1` | 221 MB | 99% | 5.1 s | 0.19 ms | 1.45 ms | 1.71 ms | 15 ms |
+| `ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8` | 80 MB | 36% | 8.2 s | 5.68 ms | 67.7 ms | 68.5 ms | 669 ms |
+
+(Raw numbers: [`bench/results/compression.json`](bench/results/compression.json).)
+
+What the numbers say:
+- **Column compression is MariaDB-specific and is the one this project uses.** It takes the table from 224 MB to 88 MB. The price is paid where the text is actually read: about 1 ms more for each version that is decompressed, and 35× more for anything that reads every version.
+- **The first run of this benchmark showed that price in the wrong place.** The timeline computed `LENGTH(content)` for every version, which on a compressed column means decompressing all of them: 54 ms instead of 1.7 ms, on every page view. The fix is in the schema: `content_bytes INT UNSIGNED AS (LENGTH(content)) STORED` works out the size once, when the row is written, and the timeline reads that column instead. It is now *faster* than on the uncompressed table (0.42 ms against 1.53 ms), probably because the compressed rows are smaller.
+- In the app, a version's text is only read when it is not in the `rendered` cache yet, so the extra 1 ms almost never happens. Page views measured after switching: 3–5 ms for the Read page.
+- **`ROW_FORMAT=COMPRESSED` is smallest but slowest.** It compresses whole 8 KB pages, so even reading `content_bytes` means decompressing pages: 68 ms for the timeline. It is also the older InnoDB format.
+- **Page compression saved almost nothing here (1%).** It compresses each 16 KB page and gives the freed space back by punching holes in the file. On this machine, Windows 11 with NTFS, the file barely shrank. A likely explanation, not tested here, is that NTFS releases the space of a sparse file in larger units than one InnoDB page, so a hole in a single page cannot be given back. On Linux filesystems with 4 KB blocks the result should be different. Run the benchmark there before you rely on this row.
+- A side observation: loaded with `insert_history`, the uncompressed table is 224 MB. Loaded with `replay`, the same data took 272 MB, which looks like the cost of 1,688 `UPDATE`s moving rows around. Measured once each, and not investigated further.
+
 ## Example queries
 
 See [`sql/examples.sql`](sql/examples.sql) for queries you can paste into the client: `AS OF`, `BETWEEN`, `ALL`, and the history-size breakdowns. All of the SQL the web app runs is in [`timemachine/queries.py`](timemachine/queries.py).
@@ -215,7 +236,7 @@ tests/test_sql.py         checks against the loaded database (python -m pytest)
 - [x] Measure how the versioned table grows (size per article, query time vs versions)
 - [x] `PARTITION BY SYSTEM_TIME`, measured
 - [x] `replay`, `insert_history` and an application-time period, compared and one chosen
-- [ ] Compression of the history (`COMPRESSED` column, page and row compression): the benchmark is written, results to come
+- [x] Compression of the history: `COMPRESSED` column, page and row compression measured, column compression applied
 - [ ] An index that keeps old-moment `AS OF` flat (for example on `sys_start`), measured
 - [ ] Where history in the database stops being the right answer (privacy deletion with `DELETE HISTORY`, storage cost)
 
